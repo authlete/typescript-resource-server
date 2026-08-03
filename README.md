@@ -12,8 +12,11 @@ against the authorization server's RFC 7662 introspection endpoint.
 | `/api/accounts/:id/transactions`        | GET    | `transactions:read`   |
 | `/api/payments`                         | POST   | `payments:write`      |
 | `/.well-known/oauth-protected-resource` | GET    | — (RFC 9728 metadata) |
+| `/`                                     | GET    | — (Swagger UI)        |
+| `/openapi.json`                         | GET    | — (OpenAPI 3 spec)    |
 
-Fixed in-memory data for one user ("Sam Smith"). Protected routes return RFC 6750
+Interactive API docs are served at `/` — use **Authorize** to add a token, then
+**Try it out**. Fixed in-memory data for one user ("Sam Smith"). Protected routes return RFC 6750
 Bearer challenges — `401` (no/invalid token) and `403 insufficient_scope` naming
 the required scope — each carrying a `resource_metadata` parameter. CORS allows
 the configured origins and exposes `WWW-Authenticate`.

@@ -7,8 +7,10 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { swaggerUI } from "@hono/swagger-ui";
 import { fromEnv, type Config } from "./config.js";
 import { makeIntrospector, type Introspector } from "./introspection.js";
+import { openApiDocument } from "./openapi.js";
 import { wellKnownRoutes } from "./routes/well-known.js";
 import { accountsRoutes } from "./routes/accounts.js";
 import { transactionsRoutes } from "./routes/transactions.js";
@@ -47,15 +49,9 @@ export function createResourceServer(config: Config): Hono {
     await next();
   });
 
-  app.get("/", (c) =>
-    c.json({
-      name: "typescript-resource-server",
-      status: "ok",
-      resource: config.resourceUrl,
-      authorization_servers: [config.asIssuer],
-      protectedResourceMetadata: `${config.resourceUrl}/.well-known/oauth-protected-resource`,
-    }),
-  );
+  // Interactive API docs at the root; the raw spec next to it.
+  app.get("/openapi.json", (c) => c.json(openApiDocument(config)));
+  app.get("/", swaggerUI({ url: "/openapi.json" }));
   app.get("/health", (c) => c.json({ status: "ok" }));
 
   app.route("/", wellKnownRoutes(deps));

@@ -31,6 +31,7 @@
     "prepare": "tsc"
   },
   "dependencies": {
+    "@hono/swagger-ui": "^0.6.1",
     "hono": "^4.6.0"
   },
   "devDependencies": {

@@ -14,6 +14,22 @@ const accountId = {
 // stays as an alternative so a pasted token still works in the rendered UI.
 const scoped = (scope: string) => [{ oauth2: [scope] }, { bearerAuth: [] }];
 
+// Headers a protected response carries when FAPI 2.0 response signing applies.
+const signedResponseHeaders = {
+  Signature: {
+    schema: { type: "string" },
+    description: "RFC 9421 HTTP message signature.",
+  },
+  "Signature-Input": {
+    schema: { type: "string" },
+    description: "Covered components and metadata for the Signature.",
+  },
+  "Content-Digest": {
+    schema: { type: "string" },
+    description: "RFC 9530 SHA-256 digest of the response body.",
+  },
+} as const;
+
 export function openApiDocument(config: Config) {
   return {
     openapi: "3.0.3",
@@ -22,7 +38,10 @@ export function openApiDocument(config: Config) {
       version: "0.1.0",
       description:
         "OAuth 2.0 protected resource server. Protected endpoints need a Bearer " +
-        "access token with the listed scope. Click **Authorize** to add one.",
+        "access token with the listed scope. Click **Authorize** to add one. " +
+        "When the token's client requires FAPI 2.0 message signing, successful " +
+        "responses carry `Signature`, `Signature-Input`, and `Content-Digest` " +
+        "headers; verify them against the keys at `/api/jwks`.",
     },
     servers: [{ url: config.resourceUrl }],
     components: {
@@ -52,13 +71,22 @@ export function openApiDocument(config: Config) {
           responses: { "200": { description: "Metadata document" } },
         },
       },
+      "/api/jwks": {
+        get: {
+          summary: "Response-signing public keys (JWK Set)",
+          description:
+            "The public keys clients use to verify FAPI 2.0 signed responses. " +
+            "Advertised as `jwks_uri` in the protected-resource metadata.",
+          responses: { "200": { description: "JWK Set" } },
+        },
+      },
       "/api/accounts": {
         get: {
           summary: "List accounts",
           description: "Requires scope `accounts:read`.",
           security: scoped("accounts:read"),
           responses: {
-            "200": { description: "Accounts" },
+            "200": { description: "Accounts", headers: signedResponseHeaders },
             "401": { description: "Missing/invalid token" },
           },
         },
@@ -70,7 +98,7 @@ export function openApiDocument(config: Config) {
           security: scoped("accounts:read"),
           parameters: [accountId],
           responses: {
-            "200": { description: "Balance" },
+            "200": { description: "Balance", headers: signedResponseHeaders },
             "404": { description: "Unknown account" },
           },
         },
@@ -82,7 +110,10 @@ export function openApiDocument(config: Config) {
           security: scoped("transactions:read"),
           parameters: [accountId],
           responses: {
-            "200": { description: "Transactions" },
+            "200": {
+              description: "Transactions",
+              headers: signedResponseHeaders,
+            },
             "403": { description: "Insufficient scope" },
           },
         },
@@ -118,7 +149,10 @@ export function openApiDocument(config: Config) {
             },
           },
           responses: {
-            "201": { description: "Payment accepted" },
+            "201": {
+              description: "Payment accepted",
+              headers: signedResponseHeaders,
+            },
             "403": { description: "Insufficient scope" },
           },
         },

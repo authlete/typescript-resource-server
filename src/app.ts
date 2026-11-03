@@ -36,6 +36,13 @@ export function createResourceServer(config: Config): Hono {
   };
   const app = new Hono();
 
+  // Surface server-side failures (a thrown introspection carries Authlete's own
+  // error, e.g. an invalid service id or token) instead of an empty 500.
+  app.onError((err, c) => {
+    console.error("resource server error:", err);
+    return c.json({ error: "server_error", error_description: err.message }, 500);
+  });
+
   // CORS spans every endpoint. Exposing WWW-Authenticate lets a browser client
   // read the challenge; the signature fields let it verify a signed response.
   if (config.allowedOrigins.length > 0) {

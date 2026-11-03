@@ -8,10 +8,7 @@
  */
 
 import type { Authlete } from "@authlete/typescript-sdk";
-import {
-  IntrospectionResponseAction,
-  type IntrospectionResponse,
-} from "@authlete/typescript-sdk/models";
+import type { IntrospectionResponse } from "@authlete/typescript-sdk/models";
 import type { Config } from "./config.js";
 
 export interface IntrospectionInput {
@@ -33,9 +30,12 @@ export interface IntrospectionInput {
 export type Introspector = (input: IntrospectionInput) => Promise<IntrospectionResponse>;
 
 export function makeIntrospector(authlete: Authlete, config: Config): Introspector {
-  return async (input) => {
-    try {
-      const { result } = await authlete.introspection.process({
+  // A failed introspection (bad service id / token, Authlete down) throws here;
+  // it is not caught — the caller's error handler surfaces Authlete's own
+  // message rather than hiding it behind an empty body.
+  return async (input) =>
+    (
+      await authlete.introspection.process({
         serviceId: config.authleteServiceId,
         introspectionRequest: {
           token: input.token,
@@ -47,10 +47,6 @@ export function makeIntrospector(authlete: Authlete, config: Config): Introspect
           requestBodyContained: input.requestBodyContained,
           scopes: input.requiredScopes,
         },
-      });
-      return result;
-    } catch {
-      return { action: IntrospectionResponseAction.InternalServerError };
-    }
-  };
+      })
+    ).result;
 }

@@ -1,12 +1,17 @@
 /**
- * Token validation via Authlete's introspection API. Beyond `{ active, scope }`
- * it forwards the request's HTTP message-signature inputs (headers, target URI,
- * method) so Authlete can verify an inbound request signature and tell the RS
- * whether the response must be signed (FAPI 2.0 Resource Response Signing).
+ * Token validation via Authlete's introspection API. The RS forwards the
+ * request's HTTP message-signature inputs (headers, target URI, method, DPoP)
+ * and the required scope, and returns Authlete's `IntrospectionResponse` as-is:
+ * `action` says what to do, `responseContent` is the ready-made challenge
+ * (Bearer or DPoP), `dpopNonce` is the nonce to echo, `responseSigningRequired`
+ * is the FAPI signing directive. The RS does not re-derive any of it.
  */
 
 import type { Authlete } from "@authlete/typescript-sdk";
-import { IntrospectionResponseAction } from "@authlete/typescript-sdk/models";
+import {
+  IntrospectionResponseAction,
+  type IntrospectionResponse,
+} from "@authlete/typescript-sdk/models";
 import type { Config } from "./config.js";
 
 export interface IntrospectionInput {
@@ -21,17 +26,11 @@ export interface IntrospectionInput {
   headers: Array<{ key: string; value: string }>;
   dpop?: string | undefined;
   requestBodyContained: boolean;
+  /** Scopes the token must cover; Authlete returns insufficient_scope otherwise. */
+  requiredScopes: string[];
 }
 
-export interface Introspection {
-  active: boolean;
-  /** Space-delimited granted scopes. */
-  scope?: string;
-  /** Whether the response must carry a FAPI message signature. */
-  responseSigningRequired: boolean;
-}
-
-export type Introspector = (input: IntrospectionInput) => Promise<Introspection>;
+export type Introspector = (input: IntrospectionInput) => Promise<IntrospectionResponse>;
 
 export function makeIntrospector(authlete: Authlete, config: Config): Introspector {
   return async (input) => {
@@ -46,20 +45,12 @@ export function makeIntrospector(authlete: Authlete, config: Config): Introspect
           headers: input.headers,
           dpop: input.dpop,
           requestBodyContained: input.requestBodyContained,
+          scopes: input.requiredScopes,
         },
       });
-      return {
-        active: result.action === IntrospectionResponseAction.Ok,
-        scope: result.scopes?.join(" "),
-        responseSigningRequired: result.responseSigningRequired === true,
-      };
+      return result;
     } catch {
-      return { active: false, responseSigningRequired: false };
+      return { action: IntrospectionResponseAction.InternalServerError };
     }
   };
-}
-
-export function hasScope(scope: string | undefined, required: string): boolean {
-  if (!scope) return false;
-  return scope.split(/\s+/).includes(required);
 }

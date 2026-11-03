@@ -2,7 +2,7 @@
 
 import { Hono } from "hono";
 import type { Deps } from "../app.js";
-import { requireScope } from "../auth/bearer.js";
+import { requireScope } from "../auth/requireScope.js";
 import { findAccount, transactions } from "../data.js";
 
 export function transactionsRoutes(deps: Deps) {

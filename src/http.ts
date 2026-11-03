@@ -3,15 +3,23 @@
 import type { Context } from "hono";
 import type { Config } from "./config.js";
 
-const jsonHeaders = { "content-type": "application/json" } as const;
+export const jsonHeaders = { "content-type": "application/json" } as const;
 
 function resourceMetadataUrl(config: Config): string {
   return `${config.resourceUrl}/.well-known/oauth-protected-resource`;
 }
 
-export function extractBearer(header: string | undefined): string | undefined {
+/** The RFC 9728 `resource_metadata` auth-param, to append to a WWW-Authenticate. */
+export function resourceMetadataParam(config: Config): string {
+  return `resource_metadata="${resourceMetadataUrl(config)}"`;
+}
+
+// The access token is presented after the scheme: `Bearer` (RFC 6750) or `DPoP`
+// (RFC 9449) when the token is sender-constrained. Authlete validates the DPoP
+// binding from the forwarded `DPoP` header during introspection.
+export function extractAccessToken(header: string | undefined): string | undefined {
   if (!header) return undefined;
-  const match = /^Bearer\s+(.+)$/i.exec(header);
+  const match = /^(?:Bearer|DPoP)\s+(.+)$/i.exec(header);
   return match?.[1]?.trim() || undefined;
 }
 

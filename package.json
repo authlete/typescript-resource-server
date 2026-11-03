@@ -28,10 +28,13 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "tsc"
+    "prepare": "tsc",
+    "gen:key": "node scripts/gen-signing-key.mjs"
   },
   "dependencies": {
+    "@authlete/typescript-sdk": "^2.0.1",
     "@hono/swagger-ui": "^0.6.1",
+    "fetch-message-signatures": "^0.1.2",
     "hono": "^4.6.0"
   },
   "devDependencies": {

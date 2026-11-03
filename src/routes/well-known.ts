@@ -10,8 +10,10 @@ export function wellKnownRoutes({ config }: Deps) {
     c.json({
       resource: config.resourceUrl,
       authorization_servers: [config.asIssuer],
+      jwks_uri: `${config.resourceUrl}/api/jwks`,
       scopes_supported: ["accounts:read", "transactions:read", "payments:write"],
       bearer_methods_supported: ["header"],
+      resource_signing_alg_values_supported: ["ES256"],
       resource_name: "Sample API",
       resource_documentation: `${config.resourceUrl}/`,
     }),

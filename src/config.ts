@@ -1,8 +1,16 @@
 /** Configuration, built from the process environment by `fromEnv()`. */
 
+import type { PrivateJwk } from "./signing.js";
+
 function optional(name: string, fallback: string): string {
   const v = process.env[name];
   return v && v.length > 0 ? v : fallback;
+}
+
+function required(name: string): string {
+  const v = process.env[name];
+  if (!v || v.length === 0) throw new Error(`Missing required environment variable: ${name}`);
+  return v;
 }
 
 function list(name: string): string[] {
@@ -17,10 +25,14 @@ function list(name: string): string[] {
 export interface Config {
   /** Issuer URL of the OAuth 2.0 authorization server this RS trusts. */
   asIssuer: string;
-  /** RFC 7662 introspection endpoint the RS POSTs tokens to. */
-  introspectionEndpoint: string;
-  /** Authorization header value the RS presents to the introspection endpoint. */
-  rsAuthorization: string;
+  /** Base URL of the Authlete API server this RS introspects tokens against. */
+  authleteBaseUrl: string;
+  /** Authlete service id that owns the tokens this RS accepts. */
+  authleteServiceId: string;
+  /** Bearer credential for the Authlete API. */
+  authleteApiToken: string;
+  /** Private JWK (ES256) used to sign resource responses; its public half is published at /api/jwks. */
+  signingKey: PrivateJwk;
   /** This server's own canonical origin — its identity and metadata base. No trailing slash. */
   resourceUrl: string;
   allowedOrigins: string[];
@@ -36,11 +48,12 @@ function resolveResourceUrl(port: number): string {
   return `http://localhost:${port}`;
 }
 
-// A bare RS_CREDENTIAL is sent as a Bearer token; a value already carrying a
-// scheme (Basic/Bearer) is sent verbatim.
-function resolveRsAuthorization(): string {
-  const cred = optional("RS_CREDENTIAL", "demo-rs-credential");
-  return /^(Bearer|Basic)\s/i.test(cred) ? cred : `Bearer ${cred}`;
+// The response-signing key comes from RESPONSE_SIGNING_JWK (a private JWK).
+function resolveSigningKey(): PrivateJwk {
+  const jwk = JSON.parse(required("RESPONSE_SIGNING_JWK")) as PrivateJwk;
+  if (!jwk.kid) throw new Error("RESPONSE_SIGNING_JWK must include a 'kid'.");
+  if (!jwk.d) throw new Error("RESPONSE_SIGNING_JWK must be a private JWK (missing 'd').");
+  return jwk;
 }
 
 export function fromEnv(): Config {
@@ -48,8 +61,10 @@ export function fromEnv(): Config {
   const asIssuer = optional("AS_ISSUER", "https://authlete-as.vercel.app").replace(/\/+$/, "");
   return {
     asIssuer,
-    introspectionEndpoint: optional("INTROSPECTION_ENDPOINT", `${asIssuer}/oauth/introspect`),
-    rsAuthorization: resolveRsAuthorization(),
+    authleteBaseUrl: optional("AUTHLETE_BASE_URL", "https://us.authlete.com").replace(/\/+$/, ""),
+    authleteServiceId: required("AUTHLETE_SERVICE_ID"),
+    authleteApiToken: required("AUTHLETE_API_TOKEN"),
+    signingKey: resolveSigningKey(),
     resourceUrl: resolveResourceUrl(port),
     allowedOrigins: list("ALLOWED_ORIGINS"),
     port,
